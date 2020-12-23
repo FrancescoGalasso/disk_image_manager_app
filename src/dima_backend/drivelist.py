@@ -29,6 +29,14 @@ class Drive(SimpleNamespace):
     is_removable: bool
     is_usb: bool
 
+    def check_writeability(self):
+        check = False
+
+        if self.is_usb and self.is_removable and not self.is_read_only:
+            check = True
+
+        return check
+
 
 def get_drive_list(by_cmd_lsblk=True, from_file_path=None):
     """
