@@ -10,12 +10,11 @@ The module is designed to run in *nix environments.
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-branches
 
-
-from types import SimpleNamespace
-from typing import Optional
 import logging
 import subprocess
 import json
+from types import SimpleNamespace
+from typing import Optional
 
 # reference: https://stackoverflow.com/a/57916747
 class Drive(SimpleNamespace):
