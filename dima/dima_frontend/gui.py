@@ -156,6 +156,10 @@ class DimaGui(QtWidgets.QMainWindow):
                     error_flag = True
                     mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT ONLY 1 ISO  \n'
                     self.show_alert_dialog(mode_w_err_msg)
+                elif not self.source_path:
+                    error_flag = True
+                    mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT AN ISO  \n'
+                    self.show_alert_dialog(mode_w_err_msg)
 
             if not error_flag: 
                 _source = self.source_path[0]
