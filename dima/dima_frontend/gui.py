@@ -10,6 +10,7 @@ from PyQt5 import QtWidgets, uic
 from PyQt5.QtCore import QProcess, Qt
 
 from dima.dima_backend.image_manager import write_dd
+from dima.dima_backend.drivelist import get_drive_list
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, 'gui.ui')
@@ -18,12 +19,10 @@ CONFIG_FILE = os.path.join(os.path.dirname(HERE), 'dima.conf')
 # TODO: improve imports for PyQt5
 
 class ModalMessageBox(QtWidgets.QMessageBox):
-    # def __init__(self):
-    #     super(ModalMessageBox, self).__init__()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setStandardButtons(QtWidgets.QMessageBox.Ok)
-        # self.resize(800, 400)
         self.setWindowModality(1)
 
         self.setStyleSheet(
@@ -44,8 +43,36 @@ class ModalMessageBox(QtWidgets.QMessageBox):
             | Qt.WindowStaysOnTopHint
             | Qt.X11BypassWindowManagerHint
         )
-        # logging.warning('*args: {}'.format(*args))
-        # logging.warning('**kwargs: {}'.format(**kwargs))
+
+
+class InputMessageBox(QtWidgets.QInputDialog):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ~ self.setOption(QtWidgets.QMessageBox.Ok)
+        # ~ self.setWindowModality(1)
+
+        # ~ self.setStyleSheet(
+            # ~ """
+                # ~ QInputDialog {
+                    # ~ font-size: 20px;
+                    # ~ font-family: monospace;
+                    # ~ border: 2px solid #999999;
+                    # ~ border-radius: 4px;
+                    # ~ background-color: #FEFEFE;
+                # ~ }
+            # ~ """
+        # ~ )
+
+        # ~ self.setWindowFlags(
+            # ~ self.windowFlags()
+            # ~ | Qt.FramelessWindowHint
+            # ~ | Qt.WindowStaysOnTopHint
+            # ~ | Qt.X11BypassWindowManagerHint
+        # ~ )
+        self.setInputMode(QtWidgets.QInputDialog.TextInput)
+        
+
 
 class DimaGui(QtWidgets.QMainWindow):
     def __init__(self):
@@ -54,15 +81,20 @@ class DimaGui(QtWidgets.QMainWindow):
 
         self.copy_process = None
         self.source_path = []
-        self.destination_path = None
+        self.destination_path = []
         self.source_file_size = None
         self.dict_sources = {}
+        # ~ self.dict_destinations = {}
+        self.plugged_devices = []
 
         # self.write_btn.setDisabled(False)
         # self.cancel_btn.setEnabled(False)
         self.write_btn.clicked.connect(lambda: self.start_process(mode='w'))
+        self.read_btn.clicked.connect(lambda: self.start_process(mode='r'))
         self.cancel_btn.clicked.connect(self.cancel_process)
+        self.refresh_btn.clicked.connect(lambda: self.refresh_devices())
         self.iso_list_widget.itemSelectionChanged.connect(self.iso_list_widget_selection_changed)
+        self.device_list_widget.itemSelectionChanged.connect(self.devices_list_widget_selection_changed)
 
         self.__idle_setup_bottons()
         self.populate_iso_list()
@@ -105,6 +137,23 @@ class DimaGui(QtWidgets.QMainWindow):
 
         _msgbox.exec()
 
+    def show_input_dialog(self, msg='', title="ISO NAME"):
+        logging.warning('calling show_input_dialog')
+
+        def button_clicked():
+            # ~ self.__restore_ui(error=False)
+            pass
+
+        _msgbox = InputMessageBox(parent=self)
+
+        # ~ _msgbox.setIcon(QtWidgets.QMessageBox.Information)
+        # ~ _msgbox.setText(msg)
+        # ~ _msgbox.setWindowTitle(title)
+
+        # ~ _msgbox.buttonClicked.connect(button_clicked)
+
+        _msgbox.exec()
+
     def cancel_process(self):
 
         if self.copy_process:
@@ -129,6 +178,7 @@ class DimaGui(QtWidgets.QMainWindow):
                 logging.warning(f'removed {self.destination_path}')
 
     def start_process(self, mode):
+        # ~ TODO: refactor start_process (unify read and write processes)
         logging.debug(f'self.copy_process: {self.copy_process}')
         if self.copy_process is None:  # No process running.
             logging.warning('Executing process')
@@ -160,6 +210,18 @@ class DimaGui(QtWidgets.QMainWindow):
                     error_flag = True
                     mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT AN ISO  \n'
                     self.show_alert_dialog(mode_w_err_msg)
+            elif mode == 'r':
+                logging.warning('READ MODE')
+                if len(self.destination_path) > 1:
+                    error_flag = True
+                    mode_r_err_msg = '  ERROR ON START READ PROCESS  \n\n  PLEASE SELECT ONLY 1 DEVICE  \n'
+                    self.show_alert_dialog(mode_r_err_msg)
+                elif not self.destination_path:
+                    error_flag = True
+                    mode_r_err_msg = '  ERROR ON START READ PROCESS  \n\n  PLEASE SELECT A DEVICE  \n'
+                    self.show_alert_dialog(mode_r_err_msg)
+                else:
+                    self.show_input_dialog()
 
             if not error_flag: 
                 _source = self.source_path[0]
@@ -171,6 +233,23 @@ class DimaGui(QtWidgets.QMainWindow):
                          other_destinations=[_destination_2],
                          write_process=self.copy_process)
                 # write_dd(_source, _destination, write_process=self.copy_process)
+
+    def refresh_devices(self):
+        try:
+            block_devices_list = get_drive_list(by_cmd_lsblk=True)
+            logging.warning(f'block_devices_list: {block_devices_list}')
+            
+            self.device_list_widget.clear()
+            for dev in block_devices_list:
+                logging.warning(f'dev: {dev}')
+                logging.warning(f'dev type: {type(dev)}')
+                logging.warning(f'check_writeability: {dev.check_writeability()}')
+                if dev.check_writeability():
+                    self.device_list_widget.addItem(str(dev.device))
+                    self.plugged_devices.append(dev)
+        except BaseException as excp:
+            logging.critical(excp)
+            
 
     def update_progress(self, stderr_data_decoded):
         data_list = stderr_data_decoded.split() 
@@ -228,14 +307,39 @@ class DimaGui(QtWidgets.QMainWindow):
 
         logging.debug(f'self.dict_sources: {self.dict_sources}')
 
+    # TODO: refactor (unify) widget_selection_changed??
+    def devices_list_widget_selection_changed(self):
+        selected_objs = self.device_list_widget.selectedItems()
+        self.destination_path = []
+
+        if len(selected_objs) > 0:
+
+            for obj in selected_objs:
+                # https://doc.qt.io/archives/qt-4.8/qlistwidgetitem.html#setData
+                # https://doc.qt.io/archives/qt-4.8/qt.html#ItemDataRole-enum
+                selected_dev_name = obj.text()
+                logging.debug(f'selected_dev_name: {selected_dev_name}')
+                _selected_dev = [plugged_dev for plugged_dev in self.plugged_devices if plugged_dev.device == selected_dev_name]
+                selected_dev= _selected_dev[0]
+                
+                obj.setData(3, selected_dev.device_path)
+                
+                # ~ TODO: rename destination_path to plugged_devices_path globally
+                self.destination_path.append(selected_dev.device_path)
+
+            # ~ logging.warning(f'Selected item(s): {obj_names}')
+
+        logging.warning(f'\tself.destination_path: {self.destination_path}')
+
     def iso_list_widget_selection_changed(self):
         selected_objs = self.iso_list_widget.selectedItems()
-        self.source_path = []
+        # ~ self.source_path = []
 
         if len(selected_objs) > 0:
             obj_names = []
 
             for obj in selected_objs:
+                # ~ obj is a QListWidgetItem
                 obj_names.append(obj.text())
                 # https://doc.qt.io/archives/qt-4.8/qlistwidgetitem.html#setData
                 # https://doc.qt.io/archives/qt-4.8/qt.html#ItemDataRole-enum
@@ -254,17 +358,17 @@ class DimaGui(QtWidgets.QMainWindow):
         self.iso_list_widget.clear()
         for elm in self.dict_sources.keys():
             self.iso_list_widget.addItem(str(elm))
-
+    
     # TODO: refactor (and renaming) for include also the status bar?
     def __idle_setup_bottons(self):
         self.write_btn.setDisabled(False)
-        self.copy_btn.setDisabled(False)
+        self.read_btn.setDisabled(False)
         self.refresh_btn.setDisabled(False)
         self.cancel_btn.setEnabled(False)
 
     def __running_setup_bottons(self):
         self.write_btn.setEnabled(False)
-        self.copy_btn.setEnabled(False)
+        self.read_btn.setEnabled(False)
         self.refresh_btn.setEnabled(False)
         self.cancel_btn.setDisabled(False)
 
@@ -274,6 +378,7 @@ class DimaGui(QtWidgets.QMainWindow):
         # self.write_btn.setDisabled(False)
         self.__idle_setup_bottons()
         self.iso_list_widget.clearSelection()
+        self.device_list_widget.clearSelection()
 
         self.iso_list_widget_update()
 
