@@ -4,7 +4,7 @@ from context import drivelist
 
 
 def test_get_drive_list():
-    test_path = os.ah.abspath(os.path.join(os.path.dirname(__file__), 'drivelist.txt'))
+    test_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'drivelist.txt'))
     lista = drivelist.get_drive_list(by_cmd_lsblk=False, from_file_path=test_path)
 
     assert len(lista) != 0
