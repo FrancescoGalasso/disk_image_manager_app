@@ -165,6 +165,21 @@ def get_list_block_devices(cmd_lsblk=True, file_path=None):
 
         return blockdevices_list_filtered       # pylint: disable=lost-exception
 
+def create_mock_drive(device_name='', 
+                      device_path='', device_size=1, 
+                      is_read_only=False, is_removable=True, 
+                      is_usb=True):
+    
+    drive_datum = Drive(
+            device=device_name,
+            device_path=device_path,
+            device_size=device_size,
+            is_read_only=is_read_only,
+            is_removable=is_removable,
+            is_usb=is_usb,
+        )
+
+    return drive_datum
 
 if __name__ == "__main__":
     get_drive_list(by_cmd_lsblk=True)
