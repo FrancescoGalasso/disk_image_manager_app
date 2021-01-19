@@ -74,6 +74,9 @@
      <height>51</height>
     </rect>
    </property>
+   <property name="readOnly">
+    <bool>true</bool>
+   </property>
   </widget>
   <widget class="QLabel" name="label">
    <property name="geometry">
@@ -221,6 +224,11 @@
      <width>401</width>
      <height>411</height>
     </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>11</pointsize>
+    </font>
    </property>
    <property name="selectionMode">
     <enum>QAbstractItemView::MultiSelection</enum>

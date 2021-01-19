@@ -6,11 +6,12 @@ import logging
 import time
 import json
 from subprocess import call
-from PyQt5 import QtWidgets, uic
+from datetime import datetime
+from PyQt5 import QtWidgets, uic, QtGui
 from PyQt5.QtCore import QProcess, Qt
 
-from dima.dima_backend.image_manager import write_dd
-from dima.dima_backend.drivelist import get_drive_list
+from dima.dima_backend.image_manager import dcfldd_wrapper
+from dima.dima_backend.drivelist import (get_drive_list, create_mock_drive)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, 'gui.ui')
@@ -49,32 +50,27 @@ class InputMessageBox(QtWidgets.QInputDialog):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # ~ self.setOption(QtWidgets.QMessageBox.Ok)
-        # ~ self.setWindowModality(1)
 
-        # ~ self.setStyleSheet(
-            # ~ """
-                # ~ QInputDialog {
-                    # ~ font-size: 20px;
-                    # ~ font-family: monospace;
-                    # ~ border: 2px solid #999999;
-                    # ~ border-radius: 4px;
-                    # ~ background-color: #FEFEFE;
-                # ~ }
-            # ~ """
-        # ~ )
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.FramelessWindowHint
+            | Qt.WindowStaysOnTopHint
+            | Qt.X11BypassWindowManagerHint
+        )
 
-        # ~ self.setWindowFlags(
-            # ~ self.windowFlags()
-            # ~ | Qt.FramelessWindowHint
-            # ~ | Qt.WindowStaysOnTopHint
-            # ~ | Qt.X11BypassWindowManagerHint
-        # ~ )
         self.setInputMode(QtWidgets.QInputDialog.TextInput)
-        
+        self.setWindowTitle('ISO NAME')
+        self.setLabelText('Type image name')
+
+        font = QtGui.QFont()
+        font.setFamily("Arial")
+        font.setPointSize(20)
+
+        self.setFont(font)    
 
 
 class DimaGui(QtWidgets.QMainWindow):
+
     def __init__(self):
         super(DimaGui, self).__init__()
         uic.loadUi(UI_PATH, self)
@@ -82,25 +78,26 @@ class DimaGui(QtWidgets.QMainWindow):
         self.copy_process = None
         self.source_path = []
         self.destination_path = []
-        self.source_file_size = None
         self.dict_sources = {}
-        # ~ self.dict_destinations = {}
         self.plugged_devices = []
+        self.json_conf = {}
 
-        # self.write_btn.setDisabled(False)
-        # self.cancel_btn.setEnabled(False)
         self.write_btn.clicked.connect(lambda: self.start_process(mode='w'))
         self.read_btn.clicked.connect(lambda: self.start_process(mode='r'))
         self.cancel_btn.clicked.connect(self.cancel_process)
         self.refresh_btn.clicked.connect(lambda: self.refresh_devices())
+
         self.iso_list_widget.itemSelectionChanged.connect(self.iso_list_widget_selection_changed)
         self.device_list_widget.itemSelectionChanged.connect(self.devices_list_widget_selection_changed)
 
-        self.__idle_setup_bottons()
-        self.populate_iso_list()
+        self.load_config_from_file()
+        self.__init_ui()
         self.show()
 
-        # TODO: create config attribute??
+    def load_config_from_file(self):
+        logging.warning(f'CONFIG_FILE: {CONFIG_FILE}')
+        with open(CONFIG_FILE, 'r') as conf_file:
+            self.json_conf = json.loads(conf_file.read())
 
     def show_alert_dialog(self, msg, title="ALERT"):
         logging.warning('calling show_alert_dialog')
@@ -138,21 +135,21 @@ class DimaGui(QtWidgets.QMainWindow):
         _msgbox.exec()
 
     def show_input_dialog(self, msg='', title="ISO NAME"):
-        logging.warning('calling show_input_dialog')
-
-        def button_clicked():
-            # ~ self.__restore_ui(error=False)
-            pass
 
         _msgbox = InputMessageBox(parent=self)
 
-        # ~ _msgbox.setIcon(QtWidgets.QMessageBox.Information)
-        # ~ _msgbox.setText(msg)
-        # ~ _msgbox.setWindowTitle(title)
+        ok = _msgbox.exec_()
+        iso_name_ = _msgbox.textValue()
+        if ok:
+            now = datetime.now()
+            date_time = now.strftime("%Y-%m-%d")
+            iso_name = ''.join([date_time, '-', iso_name_, '.img'])
+            check_flag = True
+        else:
+            self.__restore_ui()
+            check_flag = False
 
-        # ~ _msgbox.buttonClicked.connect(button_clicked)
-
-        _msgbox.exec()
+        return check_flag, iso_name
 
     def cancel_process(self):
 
@@ -183,8 +180,6 @@ class DimaGui(QtWidgets.QMainWindow):
         if self.copy_process is None:  # No process running.
             logging.warning('Executing process')
 
-            # self.cancel_btn.setDisabled(False)
-            # self.write_btn.setEnabled(False)
             self.message_label.setText('Executing process')
             self.progress_bar.setValue(0)
             self.__running_setup_bottons()
@@ -194,14 +189,13 @@ class DimaGui(QtWidgets.QMainWindow):
             self.copy_process.finished.connect(self.process_finished)
 
             error_flag = False
+            name_iso = None
 
-            # _source = '/media/dati_condivisi/alfaberry/2020-11-25-raspbian-buster-lite-alfa.img'
-            _destination = '/media/dati_condivisi/alfaberry/test.img'
-            _destination_2 = '/media/dati_condivisi/alfaberry/test2.img'
+            logging.warning(f'mode: {mode}')
+            logging.warning(f'self.source_path({len(self.source_path)}): {self.source_path}')
+            logging.warning(f'self.destination_path({len(self.destination_path)}): {self.destination_path}')
 
             if mode == 'w':
-                logging.warning(f'mode: {mode}')
-                logging.warning(f'self.source_path({len(self.source_path)}): {self.source_path}')
                 if len(self.source_path) > 1:
                     error_flag = True
                     mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT ONLY 1 ISO  \n'
@@ -210,6 +204,16 @@ class DimaGui(QtWidgets.QMainWindow):
                     error_flag = True
                     mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT AN ISO  \n'
                     self.show_alert_dialog(mode_w_err_msg)
+
+                if len(self.destination_path) > 1:
+                    error_flag = True
+                    mode_r_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT ONLY 1 DEVICE  \n'
+                    self.show_alert_dialog(mode_r_err_msg)
+                elif not self.destination_path:
+                    error_flag = True
+                    mode_r_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT A DEVICE  \n'
+                    self.show_alert_dialog(mode_r_err_msg)
+
             elif mode == 'r':
                 logging.warning('READ MODE')
                 if len(self.destination_path) > 1:
@@ -221,36 +225,23 @@ class DimaGui(QtWidgets.QMainWindow):
                     mode_r_err_msg = '  ERROR ON START READ PROCESS  \n\n  PLEASE SELECT A DEVICE  \n'
                     self.show_alert_dialog(mode_r_err_msg)
                 else:
-                    self.show_input_dialog()
+                    error_flag, name_iso = self.show_input_dialog()
+                    logging.warning(f'name_iso: {name_iso} | error_flag: {error_flag}')
 
             if not error_flag: 
                 _source = self.source_path[0]
-                self.source_file_size = os.path.getsize(_source)
-                logging.warning(f'self.source_file_size: {self.source_file_size}')
-                self.destination_path = _destination
-                write_dd(source=_source,
-                         destination=_destination,
-                         other_destinations=[_destination_2],
-                         write_process=self.copy_process)
-                # write_dd(_source, _destination, write_process=self.copy_process)
+                logging.warning(f'_source: {_source}')
+
+                dcfldd_wrapper(source=_source, destinations=self.destination_path, write_process=self.copy_process)
 
     def refresh_devices(self):
         try:
             block_devices_list = get_drive_list(by_cmd_lsblk=True)
             logging.warning(f'block_devices_list: {block_devices_list}')
-            
-            self.device_list_widget.clear()
-            for dev in block_devices_list:
-                logging.warning(f'dev: {dev}')
-                logging.warning(f'dev type: {type(dev)}')
-                logging.warning(f'check_writeability: {dev.check_writeability()}')
-                if dev.check_writeability():
-                    self.device_list_widget.addItem(str(dev.device))
-                    self.plugged_devices.append(dev)
+            self.__populate_device_list(block_devices_list)
         except BaseException as excp:
             logging.critical(excp)
             
-
     def update_progress(self, stderr_data_decoded):
         data_list = stderr_data_decoded.split() 
 
@@ -284,20 +275,15 @@ class DimaGui(QtWidgets.QMainWindow):
         mode_success_msg = '  PROCESS COMPLETED SUCCESSFULLY \n'
         self.show_success_dialog(mode_success_msg)
 
-    def populate_iso_list(self):
-
-        logging.warning(f'CONFIG_FILE: {CONFIG_FILE}')
+    def __populate_iso_list(self):
         iso_path = None
-        with open(CONFIG_FILE, 'r') as conf_file:
-            json_conf = json.loads(conf_file.read())
 
-        if 'iso_path' in json_conf.keys():
-            iso_path = json_conf.get('iso_path')
+        if 'iso_path' in self.json_conf.keys():
+            iso_path = self.json_conf.get('iso_path')
 
         if iso_path is not None and os.path.exists(iso_path):
             for root, directories, files in os.walk(iso_path):
                 for name in files:
-                    # print(name)
                     if '.img' in name:
                         self.iso_list_widget.addItem(str(name))
                         
@@ -306,6 +292,18 @@ class DimaGui(QtWidgets.QMainWindow):
                         self.dict_sources[__key] = __path
 
         logging.debug(f'self.dict_sources: {self.dict_sources}')
+
+    def __populate_device_list(self, block_devices_list):
+        self.device_list_widget.clear()
+        self.plugged_devices = []
+
+        for dev in block_devices_list:
+            logging.debug(f'dev: {dev}')
+            logging.debug(f'dev type: {type(dev)}')
+            logging.debug(f'check_writeability: {dev.check_writeability()}')
+            if dev.check_writeability():
+                self.device_list_widget.addItem(str(dev.device))
+                self.plugged_devices.append(dev)
 
     # TODO: refactor (unify) widget_selection_changed??
     def devices_list_widget_selection_changed(self):
@@ -372,6 +370,19 @@ class DimaGui(QtWidgets.QMainWindow):
         self.refresh_btn.setEnabled(False)
         self.cancel_btn.setDisabled(False)
 
+    def __init_ui(self):
+        self.__idle_setup_bottons()
+        self.__populate_iso_list()
+
+        if self.json_conf.get('debug_device_path_list'):
+            logging.warning(f'self.json_conf{type(self.json_conf)}: {self.json_conf}')
+            mock_device_list = []
+            for debug_dev in self.json_conf.get('debug_device_path_list'):
+                mock = create_mock_drive(device_name=debug_dev, device_path=debug_dev)
+                mock_device_list.append(mock)
+
+            self.__populate_device_list(mock_device_list)
+
     def __restore_ui(self, error=False):
         logging.warning(f'error: {error}')
         # self.cancel_btn.setEnabled(False)
@@ -387,6 +398,9 @@ class DimaGui(QtWidgets.QMainWindow):
 
         # safety
         self.copy_process = None
+        self.destination_path = []
+        self.source_path = []
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
