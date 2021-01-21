@@ -17,6 +17,8 @@ from types import SimpleNamespace
 from typing import Optional
 
 # reference: https://stackoverflow.com/a/57916747
+
+
 class Drive(SimpleNamespace):
     ''' Drive Class '''
     device: str
@@ -30,6 +32,13 @@ class Drive(SimpleNamespace):
     is_usb: bool
 
     def check_writeability(self):
+        """
+        Check Drive writeability
+
+        Returns:
+        check (bool): flag for writeability
+
+        """
         check = False
 
         if self.is_usb and self.is_removable and not self.is_read_only:
@@ -60,6 +69,7 @@ def get_drive_list(by_cmd_lsblk=True, from_file_path=None):
     logging.warning(f'lista_drive: {lista_drive}')
 
     return lista_drive
+
 
 def transform_block_device_to_drive(block_devices_list):
     """
@@ -94,6 +104,7 @@ def transform_block_device_to_drive(block_devices_list):
             logging.debug(f'drive_datum: {drive_datum}')
 
     return drive_list
+
 
 def get_list_block_devices(cmd_lsblk=True, file_path=None):
     """
@@ -146,7 +157,6 @@ def get_list_block_devices(cmd_lsblk=True, file_path=None):
                     if not elem.get('name').startswith(("/dev/loop", "/dev/sr", "/dev/ram")):
                         blockdevices_list_filtered.append(elem)
 
-
                 logging.debug(f'blockdevices_list_filtered({type(blockdevices_list_filtered)}): {blockdevices_list_filtered}')
 
         else:
@@ -165,21 +175,23 @@ def get_list_block_devices(cmd_lsblk=True, file_path=None):
 
         return blockdevices_list_filtered       # pylint: disable=lost-exception
 
-def create_mock_drive(device_name='', 
-                      device_path='', device_size=1, 
-                      is_read_only=False, is_removable=True, 
+
+def create_mock_drive(device_name='',   # pylint: disable=too-many-arguments, missing-function-docstring
+                      device_path='', device_size=1,
+                      is_read_only=False, is_removable=True,
                       is_usb=True):
-    
+
     drive_datum = Drive(
-            device=device_name,
-            device_path=device_path,
-            device_size=device_size,
-            is_read_only=is_read_only,
-            is_removable=is_removable,
-            is_usb=is_usb,
-        )
+        device=device_name,
+        device_path=device_path,
+        device_size=device_size,
+        is_read_only=is_read_only,
+        is_removable=is_removable,
+        is_usb=is_usb,
+    )
 
     return drive_datum
+
 
 if __name__ == "__main__":
     get_drive_list(by_cmd_lsblk=True)
