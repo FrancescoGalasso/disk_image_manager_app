@@ -5,13 +5,20 @@ import os
 import logging
 import time
 import json
+import traceback
 from subprocess import call
 from datetime import datetime
-from PyQt5 import QtWidgets, uic, QtGui
+from PyQt5 import QtWidgets, uic, QtGui, QtCore
 from PyQt5.QtCore import QProcess, Qt
 
 from dima.dima_backend.image_manager import dcfldd_wrapper
 from dima.dima_backend.drivelist import (get_drive_list, create_mock_drive)
+from dima.dima_backend.exceptions import (MissingSourcePath,
+                                          MissingDestinationsPath,
+                                          TooManySourcePath,
+                                          TooManyDestinationsPath,
+                                          EmptyArguments,
+                                          InputCancelWarning)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, 'gui.ui')
@@ -76,10 +83,10 @@ class DimaGui(QtWidgets.QMainWindow):
         uic.loadUi(UI_PATH, self)
 
         self.copy_process = None
-        self.source_path = []
-        self.destination_path = []
+        self.selected_disk_image_lst = []
+        self.selected_plugged_dev_lst = []
         self.dict_sources = {}
-        self.plugged_devices = []
+        self.plugged_devices_lst = []
         self.json_conf = {}
 
         self.write_btn.clicked.connect(lambda: self.start_process(mode='w'))
@@ -90,9 +97,20 @@ class DimaGui(QtWidgets.QMainWindow):
         self.iso_list_widget.itemSelectionChanged.connect(self.iso_list_widget_selection_changed)
         self.device_list_widget.itemSelectionChanged.connect(self.devices_list_widget_selection_changed)
 
+        self.write_btn.installEventFilter(self)
+        self.read_btn.installEventFilter(self)
+
         self.load_config_from_file()
         self.__init_ui()
         self.show()
+
+    def eventFilter(self, obj, event):
+        # if isinstance(obj, QtWidgets.QPushButton) and event.type() == QtCore.QEvent.HoverEnter:
+        if event.type() == QtCore.QEvent.HoverEnter:
+            self.__on_hovered(obj, True)
+        elif event.type() == QtCore.QEvent.HoverLeave:
+            self.__on_hovered(obj, False)
+        return super(DimaGui, self).eventFilter(obj, event)
 
     def load_config_from_file(self):
         logging.warning(f'CONFIG_FILE: {CONFIG_FILE}')
@@ -136,20 +154,26 @@ class DimaGui(QtWidgets.QMainWindow):
 
     def show_input_dialog(self, msg='', title="ISO NAME"):
 
+        iso_name_list = []
         _msgbox = InputMessageBox(parent=self)
-
         ok = _msgbox.exec_()
-        iso_name_ = _msgbox.textValue()
+
+        iso_name = _msgbox.textValue() if _msgbox.textValue() != '' else []
+
         if ok:
             now = datetime.now()
             date_time = now.strftime("%Y-%m-%d")
-            iso_name = ''.join([date_time, '-', iso_name_, '.img'])
             check_flag = True
-        else:
-            self.__restore_ui()
+            if iso_name:
+                complete_iso_name = ''.join([date_time, '-', iso_name, '.img'])
+                _iso_path = self.json_conf.get('iso_path')
+                path_complete_iso_name = os.path.join(_iso_path, complete_iso_name)
+                iso_name_list.append(path_complete_iso_name)
+
+        elif not ok:
             check_flag = False
 
-        return check_flag, iso_name
+        return check_flag, iso_name_list
 
     def cancel_process(self):
 
@@ -168,11 +192,11 @@ class DimaGui(QtWidgets.QMainWindow):
             # self.write_btn.setDisabled(False)
 
             self.__restore_ui()
-            # TODO: self.destination_path to list; parse elem and delete them
-            if '/dev/sd' not in self.destination_path and os.path.exists(self.destination_path):
+            # TODO: self.selected_plugged_dev_lst to list; parse elem and delete them
+            if '/dev/sd' not in self.selected_plugged_dev_lst and os.path.exists(self.selected_plugged_dev_lst):
                 time.sleep(1)
-                os.remove(self.destination_path)
-                logging.warning(f'removed {self.destination_path}')
+                os.remove(self.selected_plugged_dev_lst)
+                logging.warning(f'removed {self.selected_plugged_dev_lst}')
 
     def start_process(self, mode):
         # ~ TODO: refactor start_process (unify read and write processes)
@@ -188,51 +212,45 @@ class DimaGui(QtWidgets.QMainWindow):
             self.copy_process.readyReadStandardError.connect(self.handle_stderr)
             self.copy_process.finished.connect(self.process_finished)
 
-            error_flag = False
-            name_iso = None
+            try:
+                # basic list for WRITE
+                _source_list = self.selected_disk_image_lst
+                _destinations_list = self.selected_plugged_dev_lst
 
-            logging.warning(f'mode: {mode}')
-            logging.warning(f'self.source_path({len(self.source_path)}): {self.source_path}')
-            logging.warning(f'self.destination_path({len(self.destination_path)}): {self.destination_path}')
+                logging.debug(f'mode: {mode}')
+                if mode == 'r':
 
-            if mode == 'w':
-                if len(self.source_path) > 1:
-                    error_flag = True
-                    mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT ONLY 1 ISO  \n'
-                    self.show_alert_dialog(mode_w_err_msg)
-                elif not self.source_path:
-                    error_flag = True
-                    mode_w_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT AN ISO  \n'
-                    self.show_alert_dialog(mode_w_err_msg)
+                    # override list for READ 
+                    _source_list = self.selected_plugged_dev_lst
+                    _destinations_list = []
 
-                if len(self.destination_path) > 1:
-                    error_flag = True
-                    mode_r_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT ONLY 1 DEVICE  \n'
-                    self.show_alert_dialog(mode_r_err_msg)
-                elif not self.destination_path:
-                    error_flag = True
-                    mode_r_err_msg = '  ERROR ON START WRITE PROCESS  \n\n  PLEASE SELECT A DEVICE  \n'
-                    self.show_alert_dialog(mode_r_err_msg)
+                    ok_flag, name_iso = self.show_input_dialog()
+                    logging.debug(f'ok_flag: {ok_flag}')
+                    logging.debug(f'name_iso: {name_iso}')
+                    if not ok_flag:
+                        raise InputCancelWarning
+                    if name_iso:
+                        _destinations_list = name_iso
 
-            elif mode == 'r':
-                logging.warning('READ MODE')
-                if len(self.destination_path) > 1:
-                    error_flag = True
-                    mode_r_err_msg = '  ERROR ON START READ PROCESS  \n\n  PLEASE SELECT ONLY 1 DEVICE  \n'
-                    self.show_alert_dialog(mode_r_err_msg)
-                elif not self.destination_path:
-                    error_flag = True
-                    mode_r_err_msg = '  ERROR ON START READ PROCESS  \n\n  PLEASE SELECT A DEVICE  \n'
-                    self.show_alert_dialog(mode_r_err_msg)
-                else:
-                    error_flag, name_iso = self.show_input_dialog()
-                    logging.warning(f'name_iso: {name_iso} | error_flag: {error_flag}')
+                logging.info(f'_source_list({len(_source_list)}): {_source_list} | type: {type(_source_list)}')
+                logging.info(f'_destinations_list({len(_destinations_list)}): {_destinations_list} | type: {type(_destinations_list)}')
 
-            if not error_flag: 
-                _source = self.source_path[0]
-                logging.warning(f'_source: {_source}')
-
-                dcfldd_wrapper(source=_source, destinations=self.destination_path, write_process=self.copy_process)
+                dcfldd_wrapper(source=_source_list, destinations=_destinations_list,
+                               write_process=self.copy_process, mode=mode)
+            except (MissingSourcePath, MissingDestinationsPath, TooManySourcePath,
+                    TooManyDestinationsPath, EmptyArguments) as excp:
+                logging.error(traceback.format_exc())
+                logging.error(str(excp))
+                self.show_alert_dialog(msg=str(excp))
+            except InputCancelWarning:
+                logging.warning('InputCancelWarning ...')
+                self.__restore_ui(True)
+                pass
+            except Exception:
+                logging.error(traceback.format_exc())
+            # finally:
+            #     logging.warning('do finally something ...')
+            #     self.__restore_ui(True)
 
     def refresh_devices(self):
         try:
@@ -295,7 +313,7 @@ class DimaGui(QtWidgets.QMainWindow):
 
     def __populate_device_list(self, block_devices_list):
         self.device_list_widget.clear()
-        self.plugged_devices = []
+        self.plugged_devices_lst = []
 
         for dev in block_devices_list:
             logging.debug(f'dev: {dev}')
@@ -303,12 +321,12 @@ class DimaGui(QtWidgets.QMainWindow):
             logging.debug(f'check_writeability: {dev.check_writeability()}')
             if dev.check_writeability():
                 self.device_list_widget.addItem(str(dev.device))
-                self.plugged_devices.append(dev)
+                self.plugged_devices_lst.append(dev)
 
     # TODO: refactor (unify) widget_selection_changed??
     def devices_list_widget_selection_changed(self):
         selected_objs = self.device_list_widget.selectedItems()
-        self.destination_path = []
+        self.selected_plugged_dev_lst = []
 
         if len(selected_objs) > 0:
 
@@ -317,39 +335,34 @@ class DimaGui(QtWidgets.QMainWindow):
                 # https://doc.qt.io/archives/qt-4.8/qt.html#ItemDataRole-enum
                 selected_dev_name = obj.text()
                 logging.debug(f'selected_dev_name: {selected_dev_name}')
-                _selected_dev = [plugged_dev for plugged_dev in self.plugged_devices if plugged_dev.device == selected_dev_name]
+                _selected_dev = [plugged_dev for plugged_dev in self.plugged_devices_lst if plugged_dev.device == selected_dev_name]
                 selected_dev= _selected_dev[0]
                 
                 obj.setData(3, selected_dev.device_path)
                 
-                # ~ TODO: rename destination_path to plugged_devices_path globally
-                self.destination_path.append(selected_dev.device_path)
+                self.selected_plugged_dev_lst.append(selected_dev.device_path)
 
             # ~ logging.warning(f'Selected item(s): {obj_names}')
 
-        logging.warning(f'\tself.destination_path: {self.destination_path}')
+        logging.info(f'\tself.destination_path_lst: {self.selected_plugged_dev_lst}')
 
     def iso_list_widget_selection_changed(self):
         selected_objs = self.iso_list_widget.selectedItems()
-        # ~ self.source_path = []
+        self.selected_disk_image_lst = []
 
         if len(selected_objs) > 0:
-            obj_names = []
 
             for obj in selected_objs:
                 # ~ obj is a QListWidgetItem
-                obj_names.append(obj.text())
                 # https://doc.qt.io/archives/qt-4.8/qlistwidgetitem.html#setData
                 # https://doc.qt.io/archives/qt-4.8/qt.html#ItemDataRole-enum
                 obj_name = obj.text()
                 obj_path = self.dict_sources[obj_name]
                 obj.setData(3, obj_path)
 
-                self.source_path.append(obj_path)
+                self.selected_disk_image_lst.append(obj_path)
 
-            logging.warning(f'Selected item(s): {obj_names}')
-
-        logging.warning(f'\tself.source_path: {self.source_path}')
+        logging.info(f'\tself.source_path_lst: {self.selected_disk_image_lst}')
 
     def iso_list_widget_update(self):
         logging.warning('... calling iso_list_widget_update')
@@ -385,8 +398,7 @@ class DimaGui(QtWidgets.QMainWindow):
 
     def __restore_ui(self, error=False):
         logging.warning(f'error: {error}')
-        # self.cancel_btn.setEnabled(False)
-        # self.write_btn.setDisabled(False)
+
         self.__idle_setup_bottons()
         self.iso_list_widget.clearSelection()
         self.device_list_widget.clearSelection()
@@ -398,11 +410,24 @@ class DimaGui(QtWidgets.QMainWindow):
 
         # safety
         self.copy_process = None
-        self.destination_path = []
-        self.source_path = []
+        self.selected_plugged_dev_lst = []
+        self.selected_disk_image_lst = []
+
+    def __on_hovered(self, obj, show=True):
+
+        if obj == self.write_btn and show:
+            self.action_tips_label.setText('WRITE SELECTED ISO INTO SELECTED DEVICE(S)\t\tISO -> DEVICE(S)')
+        elif obj == self.read_btn and show:
+            self.action_tips_label.setText('READ FROM SELECTED DEVICE AND CREATE ISO\t\tDEVICE -> ISO')
+
+        if not show:
+            self.action_tips_label.setText('')
 
 
 if __name__ == "__main__":
+    fmt_ = '[%(asctime)s]%(levelname)s %(funcName)s() %(filename)s:%(lineno)d %(message)s'
+    logging.basicConfig(stream=sys.stdout, level='INFO', format=fmt_)
+
     app = QtWidgets.QApplication(sys.argv)
     window = DimaGui()
     app.exec_()
