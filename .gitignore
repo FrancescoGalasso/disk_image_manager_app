@@ -31,3 +31,5 @@ coverage.xml
 *.egg-info/
 build/
 dist/
+
+make.err.out
