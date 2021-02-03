@@ -419,7 +419,7 @@ class DimaGui(QtWidgets.QMainWindow):
         if obj == self.write_btn and show:
             self.action_tips_label.setText('WRITE SELECTED ISO INTO SELECTED DEVICE(S)\t\tISO -> DEVICE(S)')
         elif obj == self.read_btn and show:
-            self.action_tips_label.setText('READ FROM SELECTED DEVICE AND CREATE ISO\t\tDEVICE -> ISO')
+            self.action_tips_label.setText('READ FROM SELECTED DEVICE AND CREATE ISO\t\tISO <- DEVICE')
 
         if not show:
             self.action_tips_label.setText('')
