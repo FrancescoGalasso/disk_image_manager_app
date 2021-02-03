@@ -16,13 +16,13 @@ def _create_sample_file():
 
     return path_sample_file, source_file_size_kb
 
-def test_write_dd_single_destination():
+def test_dcfldd_wrapper_single_destination():
 
     source_file_path, source_file_size_kb = _create_sample_file()
     destination_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'sample_file_copy.txt'))
-    result = image_manager.write_dd(source_file_path, destination_file_path)
-    result = image_manager.write_dd(source=source_file_path,
-                                    destination=destination_file_path,)
+    # result = image_manager.dcfldd_wrapper(source_file_path, destination_file_path)
+    result = image_manager.dcfldd_wrapper(source=[source_file_path],
+                                    destinations=[destination_file_path],)
 
     destination_file_size_kb = os.path.getsize(destination_file_path)/1024
 
@@ -35,20 +35,19 @@ def test_write_dd_single_destination():
     if os.path.exists(destination_file_path):
         os.remove(destination_file_path)
 
-def test_write_dd_multiple_destination():
+def test_dcfldd_wrapper_multiple_destination():
 
     source_file_path, source_file_size_kb = _create_sample_file()
     destination_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'sample_file_copy.txt'))
     destination_file_path_2 = os.path.abspath(os.path.join(os.path.dirname(__file__), 'sample_file_copy_2.txt'))
-    result_single_destination = image_manager.write_dd(source_file_path, destination_file_path, [destination_file_path_2])
-    result = image_manager.write_dd(source=source_file_path,
-                                    destination=destination_file_path,
-                                    other_destinations=[destination_file_path_2],)
+    # result_single_destination = image_manager.dcfldd_wrapper(source_file_path, destination_file_path, [destination_file_path_2])
+    result = image_manager.dcfldd_wrapper(source=[source_file_path],
+                                    destinations=[destination_file_path, destination_file_path_2],)
 
     destination_file_size_kb = os.path.getsize(destination_file_path)/1024
     destination_file_size_kb_2 = os.path.getsize(destination_file_path_2)/1024
 
-    assert result_single_destination == None
+    # assert result_single_destination == None
 
     assert source_file_size_kb == destination_file_size_kb == destination_file_size_kb_2
 
