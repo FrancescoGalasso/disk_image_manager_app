@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+from dima.dima_frontend.gui import main
+
+main()

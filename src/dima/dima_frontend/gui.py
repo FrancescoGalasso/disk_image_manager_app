@@ -21,7 +21,8 @@ from dima.dima_backend.exceptions import (MissingSourcePath,
                                           InputCancelWarning)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UI_PATH = os.path.join(HERE, 'gui.ui')
+UI_PATH = os.path.join(HERE, 'ui', 'gui.ui')
+# UI_PATH = os.path.join(HERE, 'gui.ui')
 CONFIG_FILE = os.path.join(os.path.dirname(HERE), 'dima.conf')
 
 # TODO: improve imports for PyQt5
@@ -424,10 +425,14 @@ class DimaGui(QtWidgets.QMainWindow):
             self.action_tips_label.setText('')
 
 
-if __name__ == "__main__":
+def main():
     fmt_ = '[%(asctime)s]%(levelname)s %(funcName)s() %(filename)s:%(lineno)d %(message)s'
     logging.basicConfig(stream=sys.stdout, level='INFO', format=fmt_)
 
     app = QtWidgets.QApplication(sys.argv)
     window = DimaGui()
     app.exec_()
+
+
+if __name__ == "__main__":
+    main()

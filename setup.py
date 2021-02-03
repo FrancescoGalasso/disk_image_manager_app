@@ -4,13 +4,14 @@
 # pylint: disable=invalid-name
 
 import os
+import glob
 import subprocess
 
 from setuptools import setup, find_packages
 
 about = {}
-here = os.path.abspath(os.path.dirname(__file__))
-with open(file=os.path.join(here, 'dima', '__version__.py'), mode='r', encoding='utf-8') as f:
+HERE = os.path.abspath(os.path.dirname(__file__))
+with open(file=os.path.join(HERE, 'src','dima', '__version__.py'), mode='r', encoding='utf-8') as f:
     exec(f.read(), about)   # pylint: disable=exec-used
 
 with open(file='README.md', mode='r', encoding='utf-8') as f:
@@ -54,9 +55,16 @@ def main():
             'Programming Language :: Python :: 3.8',
             'Programming Language :: Python :: 3.9',
         ],
-        packages=find_packages(),
-        data_files=[],
-        scripts=[],
+        packages=find_packages(where='src'),
+        package_dir={'': 'src'},
+        data_files=[
+            ('dima/dima_frontend/ui/', list(glob.glob('src/dima/dima_frontend/ui/*'))),
+            ('dima/', list(glob.glob('src/dima/dima.conf'))),
+        ],
+        include_package_data=True,
+        scripts=[
+            'bin/dima',
+        ],
         install_requires=requires,
     )
 
