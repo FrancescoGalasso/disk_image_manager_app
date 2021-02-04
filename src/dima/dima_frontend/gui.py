@@ -322,6 +322,7 @@ class DimaGui(QtWidgets.QMainWindow):
                         __key = str(name)
                         self.dict_sources[__key] = __path
 
+        logging.info('loaded iso paths into self.dict_sources')
         logging.debug(f'self.dict_sources: {self.dict_sources}')
 
     def __populate_device_list(self, block_devices_list):
@@ -415,7 +416,7 @@ class DimaGui(QtWidgets.QMainWindow):
         self.__idle_setup_bottons()
         self.iso_list_widget.clearSelection()
         self.device_list_widget.clearSelection()
-
+        self.__populate_iso_list()
         self.iso_list_widget_update()
 
         if error:
