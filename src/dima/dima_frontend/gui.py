@@ -398,6 +398,7 @@ class DimaGui(QtWidgets.QMainWindow):
         self.cancel_btn.setDisabled(False)
 
     def __init_ui(self):
+        self.setWindowTitle('D.I.M.A.')
         self.__idle_setup_bottons()
         self.__populate_iso_list()
 
