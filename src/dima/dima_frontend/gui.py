@@ -85,6 +85,7 @@ class DimaGui(QtWidgets.QMainWindow):
         uic.loadUi(UI_PATH, self)
 
         self.copy_process = None
+        self.copy_process_mode = None
         self.selected_disk_image_lst = []
         self.selected_plugged_dev_lst = []
         self.dict_sources = {}
@@ -107,7 +108,7 @@ class DimaGui(QtWidgets.QMainWindow):
         self.show()
 
     def eventFilter(self, obj, event):
-        # if isinstance(obj, QtWidgets.QPushButton) and event.type() == QtCore.QEvent.HoverEnter:
+
         if event.type() == QtCore.QEvent.HoverEnter:
             self.__on_hovered(obj, True)
         elif event.type() == QtCore.QEvent.HoverLeave:
@@ -191,15 +192,14 @@ class DimaGui(QtWidgets.QMainWindow):
             logging.warning('killing current QProcess ..')
             self.copy_process.kill()
             self.copy_process = None
-            # self.cancel_btn.setEnabled(False)
-            # self.write_btn.setDisabled(False)
+
+            if self.copy_process_mode == 'r':
+                time.sleep(.2)
+                if os.path.exists(self.read_current_iso_path) and os.path.isfile(self.read_current_iso_path):
+                    os.remove(self.read_current_iso_path)
+                    logging.warning(f'removed {self.read_current_iso_path}')
 
             self.__restore_ui()
-            # TODO: self.selected_plugged_dev_lst to list; parse elem and delete them
-            # if '/dev/sd' not in self.selected_plugged_dev_lst and os.path.exists(self.selected_plugged_dev_lst):
-            #     time.sleep(1)
-            #     os.remove(self.selected_plugged_dev_lst)
-            #     logging.warning(f'removed {self.selected_plugged_dev_lst}')
 
     def start_process(self, mode):
         # ~ TODO: refactor start_process (unify read and write processes)
@@ -219,6 +219,7 @@ class DimaGui(QtWidgets.QMainWindow):
                 # basic list for WRITE
                 _source_list = self.selected_disk_image_lst
                 _destinations_list = self.selected_plugged_dev_lst
+                self.copy_process_mode = mode
 
                 logging.debug(f'mode: {mode}')
                 if mode == 'r':
@@ -227,28 +228,34 @@ class DimaGui(QtWidgets.QMainWindow):
                     _source_list = self.selected_plugged_dev_lst
                     _destinations_list = []
 
-                    ok_flag, name_iso = self.show_input_dialog()
+                    ok_flag, name_iso_lst = self.show_input_dialog()
                     logging.debug(f'ok_flag: {ok_flag}')
-                    logging.debug(f'name_iso: {name_iso}')
+                    logging.debug(f'name_iso_lst: {name_iso_lst}')
                     if not ok_flag:
                         raise InputCancelWarning
-                    if name_iso:
-                        _destinations_list = name_iso
+                    if name_iso_lst:
+                        _destinations_list = name_iso_lst
+                        self.read_current_iso_path = name_iso_lst[0]
 
                 logging.info(f'_source_list({len(_source_list)}): {_source_list} | type: {type(_source_list)}')
                 logging.info(f'_destinations_list({len(_destinations_list)}): {_destinations_list} | type: {type(_destinations_list)}')
 
-                dcfldd_wrapper(source=_source_list, destinations=_destinations_list,
-                               write_process=self.copy_process, mode=mode)
+                dcfldd_wrapper(source=_source_list,
+                               destinations=_destinations_list,
+                               write_process=self.copy_process,
+                               mode=mode)
+
             except (MissingSourcePath, MissingDestinationsPath, TooManySourcePath,
                     TooManyDestinationsPath, EmptyArguments) as excp:
                 logging.error(traceback.format_exc())
                 logging.error(str(excp))
                 self.show_alert_dialog(msg=str(excp))
+
             except InputCancelWarning:
                 logging.warning('InputCancelWarning ...')
                 self.__restore_ui(True)
                 pass
+
             except Exception:
                 logging.error(traceback.format_exc())
             # finally:
@@ -295,6 +302,9 @@ class DimaGui(QtWidgets.QMainWindow):
 
         mode_success_msg = '  PROCESS COMPLETED SUCCESSFULLY \n'
         self.show_success_dialog(mode_success_msg)
+
+        if self.copy_process_mode == 'r':
+            self.__populate_iso_list()
 
     def __populate_iso_list(self):
         iso_path = None
