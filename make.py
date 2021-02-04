@@ -32,6 +32,7 @@ def parse_arguments():
         default='INFO',
         help='level of verbosity in logging messages default: %(default)s.')
     parser.add_argument('-t', '--target_credentials', default='admin@192.168.1.100', help='default: "%(default)s".')
+    parser.add_argument('-a', '--target_architecture', default='x86_64', help='RBPi: "armv7l" default: "%(default)s".')
     parser.add_argument('-i', '--ignore_requires', help='if not None, ignore_requires in installing. default: "%(default)s".', action='store_const', const=1)
     parser.add_argument('-d', '--dry_run', action='store_const', const=True,
                         help='dry run: if not None, just test, do nothing. default: "%(default)s".')
@@ -91,7 +92,11 @@ def makedirs_on_target(args):
 
     tgt_cred = args.target_credentials
 
-    for pth in (VENV_PATH, LOG_PATH, TMP_PATH, CONF_PATH):
+    target_user = tgt_cred.split('@')[0]
+    cmd_ = f'ssh {tgt_cred} "if [ ! -e {DEPLOY_PATH} ]; then sudo mkdir -p {DEPLOY_PATH} && sudo chown -R {target_user}:{target_user} {DEPLOY_PATH} ;fi"'
+    exec_(cmd_, dry=args.dry_run)
+
+    for pth in (LOG_PATH, TMP_PATH, CONF_PATH):
         cmd_ = f'ssh {tgt_cred} "if [ ! -e {pth} ]; then mkdir -p {pth} ;fi"'
         exec_(cmd_, dry=args.dry_run)
 
@@ -111,7 +116,9 @@ def create_venv_on_target(args):
 
     tgt_cred = args.target_credentials
 
-    cmd_ = f'ssh {tgt_cred} "if [ ! -e {VENV_PATH} ]; then virtualenv -p /usr/bin/python3 {VENV_PATH} ;fi"'
+    extra_args = '--system-site-packages' if args.target_architecture == 'armv7l' else ''
+
+    cmd_ = f'ssh {tgt_cred} "if [ ! -e {VENV_PATH} ]; then virtualenv {extra_args} -p /usr/bin/python3 {VENV_PATH} ;fi"'
     exec_(cmd_, dry=args.dry_run)
 
 
@@ -122,6 +129,8 @@ def deploy_conf_to_target(args):
     cmds = [
         f'ssh {tgt_cred} "if [ ! -e {CONF_PATH}/supervisor/ ]; then mkdir -p {CONF_PATH}/supervisor/ ;fi"',
         f"scp {PROJECT_ROOT}/conf/supervisor.target.conf {tgt_cred}:/opt/dima/conf/supervisor/dima.conf",
+        f"scp {PROJECT_ROOT}/conf/dima.conf {tgt_cred}:/opt/dima/conf/dima.conf",
+        f'ssh {tgt_cred} "sudo supervisorctl restart dima"',
     ]
 
     for cmd_ in cmds:
