@@ -22,8 +22,9 @@ from dima.dima_backend.exceptions import (MissingSourcePath,
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, 'ui', 'gui.ui')
-# UI_PATH = os.path.join(HERE, 'gui.ui')
-CONFIG_FILE = os.path.join(os.path.dirname(HERE), 'dima.conf')
+# CONFIG_FILE = os.path.join(os.path.dirname(HERE), 'dima.conf')
+OPT_PATH = '/opt'
+CONFIG_FILE = os.path.join(OPT_PATH, 'dima', 'conf', 'dima.conf')
 
 # TODO: improve imports for PyQt5
 
@@ -114,9 +115,10 @@ class DimaGui(QtWidgets.QMainWindow):
         return super(DimaGui, self).eventFilter(obj, event)
 
     def load_config_from_file(self):
-        logging.warning(f'CONFIG_FILE: {CONFIG_FILE}')
+        logging.warning(f'CONFIG_FILE path: {CONFIG_FILE}')
         with open(CONFIG_FILE, 'r') as conf_file:
             self.json_conf = json.loads(conf_file.read())
+        logging.info('self.json_conf: {}'.format(self.json_conf))
 
     def show_alert_dialog(self, msg, title="ALERT"):
         logging.warning('calling show_alert_dialog')
@@ -166,7 +168,7 @@ class DimaGui(QtWidgets.QMainWindow):
             date_time = now.strftime("%Y-%m-%d")
             check_flag = True
             if iso_name:
-                complete_iso_name = ''.join([date_time, '-', iso_name, '.img'])
+                complete_iso_name = ''.join([date_time, '-', iso_name, '.iso'])
                 _iso_path = self.json_conf.get('iso_path')
                 path_complete_iso_name = os.path.join(_iso_path, complete_iso_name)
                 iso_name_list.append(path_complete_iso_name)
@@ -180,7 +182,7 @@ class DimaGui(QtWidgets.QMainWindow):
 
         if self.copy_process:
             self.message_label.setText('Process cancelled.')
-            kill_dd_cmd = "kill $(ps aux | grep 'dcfldd' | awk '/S+/ {print $2}')"
+            kill_dd_cmd = "sudo kill $(ps aux | grep 'dcfldd' | awk '/S+/ {print $2}')"
             logging.warning(f'kill_dd_cmd: {kill_dd_cmd}')
             call(kill_dd_cmd, shell=True)
             self.copy_process.readyReadStandardError.disconnect(self.handle_stderr)
@@ -194,10 +196,10 @@ class DimaGui(QtWidgets.QMainWindow):
 
             self.__restore_ui()
             # TODO: self.selected_plugged_dev_lst to list; parse elem and delete them
-            if '/dev/sd' not in self.selected_plugged_dev_lst and os.path.exists(self.selected_plugged_dev_lst):
-                time.sleep(1)
-                os.remove(self.selected_plugged_dev_lst)
-                logging.warning(f'removed {self.selected_plugged_dev_lst}')
+            # if '/dev/sd' not in self.selected_plugged_dev_lst and os.path.exists(self.selected_plugged_dev_lst):
+            #     time.sleep(1)
+            #     os.remove(self.selected_plugged_dev_lst)
+            #     logging.warning(f'removed {self.selected_plugged_dev_lst}')
 
     def start_process(self, mode):
         # ~ TODO: refactor start_process (unify read and write processes)
@@ -303,7 +305,7 @@ class DimaGui(QtWidgets.QMainWindow):
         if iso_path is not None and os.path.exists(iso_path):
             for root, directories, files in os.walk(iso_path):
                 for name in files:
-                    if '.img' in name:
+                    if '.img' or '.iso' in name:
                         self.iso_list_widget.addItem(str(name))
                         
                         __path = os.path.join(root, name)

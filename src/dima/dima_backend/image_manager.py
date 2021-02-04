@@ -13,6 +13,7 @@ import queue
 import os
 import time
 import signal
+import traceback
 
 from dima.dima_backend.exceptions import (MissingSourcePath,
                                           MissingDestinationsPath,
@@ -58,10 +59,14 @@ def dcfldd_wrapper(source=None, destinations=None, write_process=None, mode='w')
     cmd = ' '.join([str(elem) for elem in cmd_])
     logging.warning(f'cmd: {cmd}')
 
-    # If we have a QProcess to write with (passed in from the GUI)
-    if write_process:
-        write_process.start(cmd)
-    else:
-        logging.warning('... no write_process ...')
-        status = subprocess.check_output(cmd, shell=True).decode("utf-8")
-        logging.warning(f'status: {status}')
+    try:
+        # If we have a QProcess to write with (passed in from the GUI)
+        if write_process:
+            write_process.start(cmd)
+        else:
+            logging.warning('... no write_process ...')
+            status = subprocess.check_output(cmd, shell=True).decode("utf-8")
+            logging.warning(f'status: {status}')
+    except Exception as excp:
+        logging.error(traceback.format_exc())
+        logging.error(str(excp))
