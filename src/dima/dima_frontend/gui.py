@@ -22,7 +22,6 @@ from dima.dima_backend.exceptions import (MissingSourcePath,
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, 'ui', 'gui.ui')
-# CONFIG_FILE = os.path.join(os.path.dirname(HERE), 'dima.conf')
 OPT_PATH = '/opt'
 CONFIG_FILE = os.path.join(OPT_PATH, 'dima', 'conf', 'dima.conf')
 
