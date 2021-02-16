@@ -91,7 +91,7 @@ the script **make.py** implements some utilities or tools, useful in development
 For the description of cmdline options, try:
 ```
     $ python3 make.py -h
-	usage: make.py [-h] [-l LOG_LEVEL] [-t TARGET_CREDENTIALS] [-i] [-d] [-b] [-e] [-I] [-M] [-m] [-c] [-C]
+	usage: make.py [-h] [-l LOG_LEVEL] [-t TARGET_CREDENTIALS] [-a TARGET_ARCHITECTURE] [-i] [-d] [-b] [-e] [-I] [-M] [-m] [-c] [-C]
 
 	development tool for build/install.
 
@@ -101,6 +101,8 @@ For the description of cmdline options, try:
 	                        level of verbosity in logging messages default: INFO.
 	  -t TARGET_CREDENTIALS, --target_credentials TARGET_CREDENTIALS
 	                        default: "admin@192.168.1.100".
+	  -a TARGET_ARCHITECTURE, --target_architecture TARGET_ARCHITECTURE
+	                        RBPi: "armv7l" default: "x86_64".
 	  -i, --ignore_requires
 	                        if not None, ignore_requires in installing. default: "None".
 	  -d, --dry_run         dry run: if not None, just test, do nothing. default: "None".
@@ -111,6 +113,7 @@ For the description of cmdline options, try:
 	  -m, --makedirs_on_host
 	  -c, --create_venv_on_target
 	  -C, --deploy_conf_to_target
+
 
 ```
 
@@ -202,5 +205,5 @@ Create venv specifing target credentials and target platform (RBPi armv7l)
 #### Build the wheel on host, deploy conf files and Install dima on target
 
 ```
-	$ python3 make.py -b -c -t "admin@192.168.0.100" -I
+	$ python3 make.py -b -C -t "admin@192.168.0.100" -I
 ```
