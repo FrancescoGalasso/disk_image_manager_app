@@ -1,5 +1,5 @@
 __title__ = 'dima'
-__description__ = 'disk image manager app'
+__description__ = 'Disk Image Manager App'
 __version__ = '0.2.3'
 __build__ = 0x000203
 __author__ = 'Francesco Galasso'
