@@ -11,6 +11,7 @@ from datetime import datetime
 from PyQt5 import QtWidgets, uic, QtGui, QtCore
 from PyQt5.QtCore import QProcess, Qt
 
+from dima import __version__ as about
 from dima.dima_backend.image_manager import dcfldd_wrapper
 from dima.dima_backend.drivelist import (get_drive_list, create_mock_drive)
 from dima.dima_backend.exceptions import (MissingSourcePath,
@@ -443,6 +444,8 @@ class DimaGui(QtWidgets.QMainWindow):
         self.setWindowTitle('D.I.M.A.')
         self.__idle_setup_bottons()
         self.__populate_iso_list()
+
+        self.label_version.setText(f'v. {about.__version__}')
 
         if self.json_conf.get('debug_device_path_list'):
             logging.warning(f'self.json_conf{type(self.json_conf)}: {self.json_conf}')
