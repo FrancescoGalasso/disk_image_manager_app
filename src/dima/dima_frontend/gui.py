@@ -339,6 +339,7 @@ class DimaGui(QtWidgets.QMainWindow):
 
         if self.copy_process_mode == 'r':
             self.__populate_iso_list()
+            # self.iso_list_widget_update()
 
     def __populate_iso_list(self):
         iso_path = None
@@ -350,11 +351,13 @@ class DimaGui(QtWidgets.QMainWindow):
             for root, directories, files in os.walk(iso_path):
                 for name in files:
                     if '.img' or '.iso' in name:
-                        self.iso_list_widget.addItem(str(name))
+                        # self.iso_list_widget.addItem(str(name))
                         
                         __path = os.path.join(root, name)
                         __key = str(name)
                         self.dict_sources[__key] = __path
+
+            self.iso_list_widget_update()
 
         logging.info('loaded iso paths into self.dict_sources')
         logging.debug(f'self.dict_sources: {self.dict_sources}')
@@ -457,7 +460,7 @@ class DimaGui(QtWidgets.QMainWindow):
         self.iso_list_widget.clearSelection()
         self.device_list_widget.clearSelection()
         self.__populate_iso_list()
-        self.iso_list_widget_update()
+        # self.iso_list_widget_update()
 
         if error:
             self.message_label.setText('')
