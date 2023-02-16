@@ -31,7 +31,6 @@ class ModalMessageBox(QtWidgets.QMessageBox):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setStandardButtons(QtWidgets.QMessageBox.Ok)
         self.setWindowModality(1)
 
         self.setStyleSheet(
@@ -95,6 +94,7 @@ class DimaGui(QtWidgets.QMainWindow):
         self.read_btn.clicked.connect(lambda: self.start_process(mode='r'))
         self.cancel_btn.clicked.connect(self.cancel_process)
         self.refresh_btn.clicked.connect(lambda: self.refresh_devices())
+        self.delete_iso_btn.clicked.connect(lambda: self.delete_selected_iso())
 
         self.iso_list_widget.itemSelectionChanged.connect(self.iso_list_widget_selection_changed)
         self.device_list_widget.itemSelectionChanged.connect(self.devices_list_widget_selection_changed)
@@ -154,6 +154,37 @@ class DimaGui(QtWidgets.QMainWindow):
         _msgbox.buttonClicked.connect(button_clicked)
 
         _msgbox.exec()
+
+    def show_msg_dialog(self, msg, type):
+
+        logging.warning('calling show_msg_dialog')
+
+        _icons = {'success': QtWidgets.QMessageBox.Information,
+                  'alert': QtWidgets.QMessageBox.Critical,
+                  'question': QtWidgets.QMessageBox.Question}[type]
+
+        _dialog_btns = {'success': QtWidgets.QMessageBox.Ok,
+                        'alert': QtWidgets.QMessageBox.Ok,
+                        'question': QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No}[type]
+
+        _error = True if type == 'alert' else False
+
+        _msgbox = ModalMessageBox(parent=self)
+
+        _msgbox.setIcon(_icons)
+        _msgbox.setText(msg)
+        _msgbox.setStandardButtons(_dialog_btns)
+        result = _msgbox.exec_()
+
+        if result == QtWidgets.QMessageBox.Yes:
+            logging.warning('Delete ISO {}'.format(self.selected_disk_image_lst))
+            cmd_ = 'sudo rm {}'.format(self.selected_disk_image_lst[0])
+            logging.warning('cmd_ {}'.format(cmd_))
+            os.system(cmd_)
+            self.__restore_ui(error=_error)
+        else:
+            logging.warning('refresh UI')
+            self.__restore_ui(error=_error)
 
     def show_input_dialog(self, msg='', title="ISO NAME"):
 
@@ -268,7 +299,11 @@ class DimaGui(QtWidgets.QMainWindow):
             self.__populate_device_list(block_devices_list)
         except BaseException as excp:
             logging.critical(excp)
-            
+    
+    def delete_selected_iso(self):
+        # self.show_alert_dialog(msg="delete me!")
+        self.show_msg_dialog(msg="delete me!", type='question')
+
     def update_progress(self, stderr_data_decoded):
         data_list = stderr_data_decoded.split() 
 
@@ -376,6 +411,11 @@ class DimaGui(QtWidgets.QMainWindow):
                 self.selected_disk_image_lst.append(obj_path)
 
         logging.info(f'\tself.source_path_lst: {self.selected_disk_image_lst}')
+
+        if len(selected_objs) == 1:
+            self.delete_iso_btn.setEnabled(True)
+        else:
+            self.delete_iso_btn.setEnabled(False)
 
     def iso_list_widget_update(self):
         logging.warning('... calling iso_list_widget_update')

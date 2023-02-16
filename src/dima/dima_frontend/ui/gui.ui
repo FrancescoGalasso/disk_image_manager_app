@@ -276,6 +276,22 @@
     <string>REFRESH DEVICES</string>
    </property>
   </widget>
+  <widget class="QPushButton" name="delete_iso_btn">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>510</x>
+     <y>240</y>
+     <width>161</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>DELETE ISO</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>

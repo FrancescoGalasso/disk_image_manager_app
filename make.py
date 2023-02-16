@@ -84,7 +84,7 @@ def install_editable(args):
 
     ignore_requires = '--ignore-requires --no-dependencies ' if args.ignore_requires else ''
 
-    cmd_ = f"cd {PROJECT_ROOT};. {VENV_PATH}/bin/activate;pip uninstall -y {__app_name__}; pip install {ignore_requires} -e ./"
+    cmd_ = f"cd {PROJECT_ROOT};. {PROJECT_ROOT}/venv/bin/activate;pip uninstall -y dima; pip install {ignore_requires} -e ./"
     exec_(cmd_, dry=args.dry_run)
 
 
